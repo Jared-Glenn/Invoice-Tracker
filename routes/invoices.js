@@ -19,7 +19,7 @@ router.get('/:id', async (req, res, next) => {
 
         if (result.rows.length === 0) {
             console.log("throw error")
-            throw new ExpressError(`Can't find invoice with id of ${req.params.id}`, 404);
+            throw new ExpressError(`Can't find invoice with ID of ${req.params.id}`, 404);
         }
         const company = await db.query(`SELECT * FROM companies WHERE code=$1`,
         [result.rows[0]["comp_code"]]);
@@ -43,21 +43,52 @@ router.post('/', async (req, res, next) => {
     }
 })
 
-// START HERE!!!!!!!!!!!!!!
-
-// Edit existing company.
-router.put('/:code', async (req, res, next) => {
+// Edit existing invoice.
+router.put('/:id', async (req, res, next) => {
     try {
-        const { name, description } = req.body;
-        const result = await db.query(
-            `UPDATE companies SET name=$2, description=$3
-            WHERE code=$1
-            RETURNING code, name, description`,
-            [req.params.code, name, description]
-        );
-        console.log(result.rows[0])
+        const { id } = req.params;
+        const { comp_code, amt, paid, add_date, paid_date } = req.body;
+        let query = 'UPDATE invoices SET ';
+        let queryValues = [];
+        let queryParams = [];
+
+        // Check each property in the body. Leave all others the same.
+        if (comp_code !== undefined) {
+            queryValues.push(`comp_code = $${queryValues.length + 1}`);
+            queryParams.push(comp_code);
+        }
+        if (amt !== undefined) {
+            queryValues.push(`amt = $${queryValues.length + 1}`);
+            queryParams.push(amt);
+        }
+        if (paid !== undefined) {
+            queryValues.push(`paid = $${queryValues.length + 1}`);
+            queryParams.push(paid);
+        }
+        if (add_date !== undefined) {
+            queryValues.push(`add_date = $${queryValues.length + 1}`);
+            queryParams.push(add_date);
+        }
+        if (paid_date !== undefined) {
+            queryValues.push(`paid_date = $${queryValues.length + 1}`);
+            queryParams.push(paid_date);
+        }
+
+        // Send error if no properties were changed.
+        if (queryValues.length === 0) {
+            throw new ExpressError("Must update at least one property of the invoice.", 400)
+        }
+
+        query += queryValues.join(", ");
+        query += ` WHERE id = $${queryValues.length + 1}
+            RETURNING id, comp_code, amt, paid, add_date, paid_date`;
+        queryParams.push(id);
+
+        const result = await db.query(query, queryParams);
+        
+        // Send error if the invoice id does not exist.
         if (result.rows.length === 0) {
-            throw new ExpressError(`Can't find company with code ${req.params.code}.`, 404);
+            throw new ExpressError(`Can't find invoice with ID of ${id}.`, 404);
         }
         return res.json(result.rows[0]);
     }
@@ -66,17 +97,17 @@ router.put('/:code', async (req, res, next) => {
     }
 });
 
-// Delete existing company.
-router.delete('/:code', async (req, res, next) => {
+// Delete existing invoice.
+router.delete('/:id', async (req, res, next) => {
     try {
-        const result = await db.query(`SELECT * FROM companies WHERE code=$1`, [req.params.code]);
+        const result = await db.query(`SELECT * FROM invoices WHERE id=$1`, [req.params.id]);
 
         if (result.rows.length === 0) {
-            throw new ExpressError(`Can't find company with code ${req.params.code} to delete it.`, 404);
+            throw new ExpressError(`Can't find invoice with ID of ${req.params.id} to delete it.`, 404);
         }
-        await db.query(`DELETE FROM companies
-            WHERE code=$1`,
-            [req.params.code]
+        await db.query(`DELETE FROM invoices
+            WHERE id=$1`,
+            [req.params.id]
         );
 
         return res.json({message: "Deleted"});
