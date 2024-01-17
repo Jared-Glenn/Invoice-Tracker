@@ -46,7 +46,15 @@ router.post('/', async (req, res, next) => {
 // Edit existing invoice.
 router.put('/:id', async (req, res, next) => {
     try {
+        console.log(Date.now());
+        
         const { id } = req.params;
+
+        const check = await db.query(`SELECT paid FROM invoices WHERE id=$1`,
+        [req.params.id]);
+
+        const wasPaid = check.rows[0]["paid"];
+
         const { comp_code, amt, paid, add_date, paid_date } = req.body;
         let query = 'UPDATE invoices SET ';
         let queryValues = [];
@@ -69,14 +77,22 @@ router.put('/:id', async (req, res, next) => {
             queryValues.push(`add_date = $${queryValues.length + 1}`);
             queryParams.push(add_date);
         }
+
         if (paid_date !== undefined) {
             queryValues.push(`paid_date = $${queryValues.length + 1}`);
             queryParams.push(paid_date);
+        } else if (wasPaid === false && paid === true) {
+            queryValues.push(`paid_date = $${queryValues.length + 1}`);
+            const new_paid_date = new Date();
+            queryParams.push(new_paid_date);
+        } else if (wasPaid === true && paid === false) {
+            queryValues.push(`paid_date = $${queryValues.length + 1}`);
+            queryParams.push(null);
         }
 
         // Send error if no properties were changed.
         if (queryValues.length === 0) {
-            throw new ExpressError("Must update at least one property of the invoice.", 400)
+            throw new ExpressError("Must update at least one property of the invoice.", 404)
         }
 
         query += queryValues.join(", ");
