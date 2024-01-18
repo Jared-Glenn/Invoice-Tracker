@@ -1,14 +1,16 @@
-// Routes for the company Invoice Tracker.
+// Routes for the industries in the Invoice Tracker.
 
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
 const ExpressError = require("../expressError");
-const slugify = require("slugify");
 
 // Get full list of companies.
 router.get('/', async (req, res) => {
-    const results = await db.query(`SELECT * FROM companies`);
+    const results = await db.query(`    SELECT i.code, i.industry, ci.comp_code
+                                        FROM industries as i
+                                        LEFT JOIN companies_industries AS ci
+                                        ON i.code = ci.ind_code`);
     return res.json(results.rows)
 });
 
